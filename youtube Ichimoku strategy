@@ -1,0 +1,134 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Blockhead305
+
+//@version=5
+indicator(title = "Ichimoku youtube strategy", shorttitle = "Ichi", overlay = true, max_labels_count = 500)
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////Inputs
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+group_ichi = "Ichimoku"
+tenkan_len = input.int(defval = 9, title = "Tenkan sen length", minval = 1, maxval = 40, step = 1, group = group_ichi)
+kijun_len = input.int(defval = 26, title = "Kijun sen length", minval = 1, maxval = 200, step = 1, group = group_ichi)
+senkou_B_len = input.int(defval = 52, title = "Senkou span B len", minval = 1, maxval = 300, step = 1, group = group_ichi)
+offset = input.int(defval = 26, title = "Offset", minval = 1, maxval = 50, step = 1, group = group_ichi)
+
+group_entry_filters = "Filters"
+use_kumo_trend = input.bool(defval = false, title = "Use kumo trend", inline = "kumo filter", group = group_entry_filters)
+use_kumo_correlation = input.bool(defval = false, title = "Use kumo correlation", inline = "kumo filter", group = group_entry_filters)
+
+
+group_entry_rules = "Entry rules"
+tenkan_sen_cross_bool = input.bool(defval = false, title = "tenkan cross", inline = "inline tenkan", group = group_entry_rules)
+tenkan_sen_slope_bool = input.bool(defval = false, title = "tenkan slope", inline = "inline tenkan", group = group_entry_rules)
+kijun_sen_cross_bool = input.bool(defval = false, title = "kijun cross", inline = "inline kijun", group = group_entry_rules)
+kijun_sen_slope_bool = input.bool(defval = false, title = "kijun slope", inline = "inline kijun", group = group_entry_rules)
+kumo_breakout_bool = input.bool(defval = false, title = "Kumo brakout", group = group_entry_rules)
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////Ichimoku calculations
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+tenkan_upper = ta.highest(high, tenkan_len)
+tenkan_Lower = ta.lowest(low, tenkan_len)
+tenkan_sen = (tenkan_upper + tenkan_Lower) / 2
+
+kijun_upper = ta.highest(high, kijun_len)
+kijun_lower = ta.lowest(low, kijun_len)
+kijun_sen = (kijun_upper + kijun_lower) / 2
+
+senkou_A = (tenkan_sen + kijun_sen) / 2
+
+senkou_B_upper = ta.highest(high, senkou_B_len)
+senkou_B_lower = ta.lowest(low, senkou_B_len)
+senkou_B = (senkou_B_upper + senkou_B_lower) / 2
+
+cloud_color = senkou_A > senkou_B ? color.rgb(0, 255, 8) : color.rgb(255, 0, 0)
+
+chikou = close
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////Entry conditions
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var int cloud_trend = 0
+if senkou_A[offset] > senkou_B[offset]
+    cloud_trend := 1
+else if senkou_A[offset] <= senkou_B[offset]
+    cloud_trend := -1
+
+var int cloud_correlation = 0
+if close > math.max(senkou_A[offset], senkou_B[offset])
+    cloud_correlation := 1
+else if close < math.min(senkou_A[offset], senkou_B[offset])
+    cloud_correlation := -1
+else
+    cloud_correlation := 0
+
+// tenkan_sen_cross_bool = input.bool(defval = false, title = "tenkan cross", group = group_entry_rules)
+// tenkan_sen_slope_bool = input.bool(defval = false, title = "tenkan slope", group = group_entry_rules)
+// kijun_sen_cross_bool = input.bool(defval = false, title = "kijun cross", group = group_entry_rules)
+// kijun_sen_slope_bool = input.bool(defval = false, title = "kijun slope", group = group_entry_rules)
+
+/////////////Tenkan entries
+//////////////////////////////////////////////////////////
+tenkan_sen_crossover = (use_kumo_correlation ? cloud_correlation == 1 : true) and (use_kumo_trend ? cloud_trend == 1 : true) and (tenkan_sen_cross_bool ? (close > tenkan_sen and close[1] <= tenkan_sen[1]) : false)
+tenkan_sen_crossunder = (use_kumo_correlation ? cloud_correlation == -1 : true) and (use_kumo_trend ? cloud_trend == -1 : true) and (tenkan_sen_cross_bool ? (close < tenkan_sen and close[1] >= tenkan_sen[1]) : false)
+tenkan_slope_buy = (use_kumo_correlation ? cloud_correlation == 1 : true) and (use_kumo_trend ? cloud_trend == 1 : true) and (tenkan_sen_slope_bool ? (tenkan_sen > tenkan_sen[1] and tenkan_sen[1] <= tenkan_sen[2]) : false)
+tenkan_slope_sell = (use_kumo_correlation ? cloud_correlation == -1 : true) and (use_kumo_trend ? cloud_trend == -1 : true) and (tenkan_sen_slope_bool ? (tenkan_sen < tenkan_sen[1] and tenkan_sen[1] >= tenkan_sen[2]) : false)
+
+/////////////Kijun entries
+//////////////////////////////////////////////////////////
+
+kijun_sen_crossover = (use_kumo_correlation ? cloud_correlation == 1 : true) and (use_kumo_trend ? cloud_trend == 1 : true) and (kijun_sen_cross_bool ? (close > kijun_sen and close[1] <= kijun_sen[1]) : false)
+kijun_sen_crossunder = (use_kumo_correlation ? cloud_correlation == -1 : true) and (use_kumo_trend ? cloud_trend == -1 : true) and (kijun_sen_cross_bool ? (close < kijun_sen and close[1] >= kijun_sen[1]) : false)
+kijun_slope_buy = (use_kumo_correlation ? cloud_correlation == 1 : true) and (use_kumo_trend ? cloud_trend == 1 : true) and (kijun_sen_slope_bool ? (kijun_sen > kijun_sen[1] and kijun_sen[1] <= kijun_sen[2]) : false)
+kijun_slope_sell = (use_kumo_correlation ? cloud_correlation == -1 : true) and (use_kumo_trend ? cloud_trend == -1 : true) and (kijun_sen_slope_bool ? (kijun_sen < kijun_sen[1] and kijun_sen[1] >= kijun_sen[2]) : false)
+
+/////////////Kumo breakout
+//////////////////////////////////////////////////////////
+
+bullish_kumo_breakout = kumo_breakout_bool and (use_kumo_trend ? cloud_trend == 1 : true) and close > math.max(senkou_A[offset], senkou_B[offset]) and close[1] <= math.max(senkou_A[offset], senkou_B[offset])
+bearish_kumo_breakout = kumo_breakout_bool and (use_kumo_trend ? cloud_trend == -1 : true) and close < math.min(senkou_A[offset], senkou_B[offset]) and close[1] >= math.min(senkou_A[offset], senkou_B[offset])
+
+
+
+buy = tenkan_sen_crossover or tenkan_slope_buy or kijun_sen_crossover or kijun_slope_buy or bullish_kumo_breakout
+sell = tenkan_sen_crossunder or tenkan_slope_sell or kijun_sen_crossunder or kijun_slope_sell or bearish_kumo_breakout
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////plots
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+plot(tenkan_sen, color = color.rgb(0, 47, 255))
+plot(tenkan_sen, color = color.rgb(0, 47, 255, 67), linewidth = 5)
+plot(kijun_sen, color = color.rgb(255, 72, 0))
+plot(kijun_sen, color = color.rgb(255, 72, 0, 53), linewidth = 5)
+p_senkou_A = plot(senkou_A, offset = offset, color = cloud_color)
+plot(senkou_A, offset = offset, color = color.new(cloud_color, 75), linewidth = 5)
+p_senkou_B = plot(senkou_B, offset = offset, color = cloud_color)
+plot(senkou_B, offset = offset, color = color.new(cloud_color, 75), linewidth = 5)
+fill(p_senkou_A, p_senkou_B, color = color.new(cloud_color, 75))
+plot(chikou, offset = -offset, color = color.rgb(0, 104, 3))
+plot(chikou, offset = -offset, color = color.rgb(0, 104, 3, 49), linewidth = 5)
+
+if buy
+    label.new(bar_index, low, "B", xloc = xloc.bar_index, color = color.rgb(58, 29, 190), textcolor = color.white, style = label.style_label_up)
+    if barstate.isconfirmed
+        alert("Buy: " + str.tostring(syminfo.ticker), freq = alert.freq_once_per_bar_close)
+if sell
+    label.new(bar_index, high, "S", xloc = xloc.bar_index, color = color.rgb(209, 4, 4), textcolor = color.white, style = label.style_label_down)
+    if barstate.isconfirmed
+        alert("Sell: " + str.tostring(syminfo.ticker), freq = alert.freq_once_per_bar_close)
+
+
+
